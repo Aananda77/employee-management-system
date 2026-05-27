@@ -1,0 +1,104 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+code {
+  font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
+    monospace;
+}
+
+.sidebar {
+  min-height: 100vh;
+  background-color: #1a1a2e;
+  color: white;
+}
+
+.sidebar a {
+  color: white;
+  text-decoration: none;
+  padding: 10px 15px;
+  display: block;
+  transition: all 0.3s;
+}
+
+.sidebar a:hover, .sidebar a.active {
+  background-color: #16213e;
+}
+
+.main-content {
+  min-height: 100vh;
+  background-color: #f8f9fa;
+}
+
+.card-dashboard {
+  border: none;
+  box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+  transition: all 0.3s;
+}
+
+.card-dashboard:hover {
+  box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+  transform: translateY(-2px);
+}
+
+.status-badge {
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.status-pending {
+  background-color: #ffc107;
+  color: #000;
+}
+
+.status-approved, .status-present, .status-completed {
+  background-color: #28a745;
+  color: white;
+}
+
+.status-rejected, .status-absent {
+  background-color: #dc3545;
+  color: white;
+}
+
+.status-in_progress {
+  background-color: #17a2b8;
+  color: white;
+}
+
+.status-late {
+  background-color: #fd7e14;
+  color: white;
+}
+
+.priority-low {
+  background-color: #6c757d;
+  color: white;
+}
+
+.priority-medium {
+  background-color: #ffc107;
+  color: #000;
+}
+
+.priority-high {
+  background-color: #fd7e14;
+  color: white;
+}
+
+.priority-urgent {
+  background-color: #dc3545;
+  color: white;
+}
