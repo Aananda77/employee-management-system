@@ -2,18 +2,19 @@ import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { 
-  FaHome, FaUsers, FaTasks, FaCalendarCheck, FaFileAlt, FaBell, 
+  FaHome, FaBuilding, FaUsers, FaTasks, FaCalendarCheck, FaFileAlt, FaBell, 
   FaUsersCog, FaUserPlus, FaSignOutAlt 
 } from 'react-icons/fa';
 
 const Sidebar: React.FC = () => {
-  const { user, logout } = useAuth();
+  const { userData, logout } = useAuth();
   const location = useLocation();
 
   const isActive = (path: string) => location.pathname === path;
 
   const adminLinks = [
     { path: '/admin/dashboard', name: 'Dashboard', icon: <FaHome /> },
+    { path: '/admin/departments', name: 'Departments', icon: <FaBuilding /> },
     { path: '/admin/teams', name: 'Teams', icon: <FaUsersCog /> },
     { path: '/admin/users', name: 'Users', icon: <FaUserPlus /> },
     { path: '/admin/tasks', name: 'Tasks', icon: <FaTasks /> },
@@ -38,8 +39,8 @@ const Sidebar: React.FC = () => {
     { path: '/employee/announcements', name: 'Announcements', icon: <FaBell /> }
   ];
 
-  const links = user?.role === 'admin' ? adminLinks : 
-                user?.role === 'manager' ? managerLinks : employeeLinks;
+  const links = userData?.role === 'admin' ? adminLinks : 
+                userData?.role === 'manager' ? managerLinks : employeeLinks;
 
   return (
     <div className="sidebar col-md-2 d-none d-md-block p-0">
@@ -49,8 +50,8 @@ const Sidebar: React.FC = () => {
       </div>
       
       <div className="p-3 border-bottom border-secondary">
-        <p className="mb-0 text-capitalize">{user?.role}</p>
-        <small className="text-muted">{user?.username}</small>
+        <p className="mb-0 text-capitalize">{userData?.role}</p>
+        <small className="text-muted">{userData?.username}</small>
       </div>
 
       <nav className="p-2">

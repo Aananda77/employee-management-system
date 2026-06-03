@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import { db } from '../firebase/config';
+import { collection, getDocs, addDoc, Timestamp } from 'firebase/firestore';
 import toast from 'react-hot-toast';
 import { useAuth } from '../context/AuthContext';
 import Sidebar from '../components/Sidebar';
@@ -7,7 +8,7 @@ import Navbar from '../components/Navbar';
 import { Modal, Button, Form } from 'react-bootstrap';
 
 const Announcements: React.FC = () => {
-  const { user } = useAuth();
+  const { userData } = useAuth();
   const [announcements, setAnnouncements] = useState<any[]>([]);
   const [teams, setTeams] = useState<any[]>([]);
   const [showModal, setShowModal] = useState(false);
@@ -15,31 +16,35 @@ const Announcements: React.FC = () => {
     title: '',
     content: '',
     visibility: 'all',
-    team_id: ''
+    teamId: ''
   });
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     fetchAnnouncements();
-    if (user?.role === 'admin' || user?.role === 'manager') {
+    if (userData?.role === 'admin' || userData?.role === 'manager') {
       fetchTeams();
     }
-  }, []);
+  }, [userData?.role]);
 
   const fetchAnnouncements = async () => {
     try {
-      const response = await axios.get('/api/announcements');
-      setAnnouncements(response.data.announcements);
-    } catch (error: any) {
+      const querySnapshot = await getDocs(collection(db, 'announcements'));
+      const announcementsList: any[] = [];
+      querySnapshot.forEach(doc => announcementsList.push({ id: doc.id, ...doc.data() }));
+      setAnnouncements(announcementsList.sort((a, b) => b.createdAt?.toDate() - a.createdAt?.toDate()));
+    } catch (error) {
       toast.error('Failed to fetch announcements');
     }
   };
 
   const fetchTeams = async () => {
     try {
-      const response = await axios.get('/api/teams');
-      setTeams(response.data.teams);
-    } catch (error: any) {
+      const querySnapshot = await getDocs(collection(db, 'teams'));
+      const teamsList: any[] = [];
+      querySnapshot.forEach(doc => teamsList.push({ id: doc.id, ...doc.data() }));
+      setTeams(teamsList);
+    } catch (error) {
       toast.error('Failed to fetch teams');
     }
   };
@@ -49,12 +54,16 @@ const Announcements: React.FC = () => {
     setLoading(true);
     
     try {
-      await axios.post('/api/announcements', formData);
+      await addDoc(collection(db, 'announcements'), {
+        ...formData,
+        createdAt: Timestamp.now(),
+        createdBy: userData?.username
+      });
       toast.success('Announcement created successfully');
       setShowModal(false);
       fetchAnnouncements();
-    } catch (error: any) {
-      toast.error(error.response?.data?.message || 'Operation failed');
+    } catch (error) {
+      toast.error('Failed to create announcement');
     } finally {
       setLoading(false);
     }
@@ -69,7 +78,7 @@ const Announcements: React.FC = () => {
           <div className="container-fluid">
             <div className="d-flex justify-content-between align-items-center mb-4">
               <h2>Announcements</h2>
-              {(user?.role === 'admin' || user?.role === 'manager') && (
+              {(userData?.role === 'admin' || userData?.role === 'manager') && (
                 <button
                   className="btn btn-primary"
                   onClick={() => setShowModal(true)}
@@ -86,7 +95,7 @@ const Announcements: React.FC = () => {
                     <div className="card-header d-flex justify-content-between align-items-center">
                       <h5 className="mb-0">{announcement.title}</h5>
                       <small className="text-muted">
-                        {new Date(announcement.created_at).toLocaleDateString()}
+                        {announcement.createdAt?.toDate().toLocaleDateString()}
                       </small>
                     </div>
                     <div className="card-body">
@@ -96,14 +105,14 @@ const Announcements: React.FC = () => {
                           <span className="badge bg-secondary me-2">
                             {announcement.visibility}
                           </span>
-                          {announcement.team_name && (
+                          {announcement.teamId && (
                             <span className="badge bg-info">
-                              {announcement.team_name}
+                              {teams.find(t => t.id === announcement.teamId)?.teamName}
                             </span>
                           )}
                         </div>
                         <small className="text-muted">
-                          By: {announcement.created_by_username}
+                          By: {announcement.createdBy}
                         </small>
                       </div>
                     </div>
@@ -115,7 +124,7 @@ const Announcements: React.FC = () => {
         </div>
       </div>
 
-      {(user?.role === 'admin' || user?.role === 'manager') && (
+      {(userData?.role === 'admin' || userData?.role === 'manager') && (
         <Modal show={showModal} onHide={() => setShowModal(false)} size="lg">
           <Modal.Header closeButton>
             <Modal.Title>Create Announcement</Modal.Title>
@@ -157,14 +166,14 @@ const Announcements: React.FC = () => {
                 <Form.Group className="mb-3">
                   <Form.Label>Team</Form.Label>
                   <Form.Select
-                    value={formData.team_id}
-                    onChange={(e) => setFormData({ ...formData, team_id: e.target.value })}
+                    value={formData.teamId}
+                    onChange={(e) => setFormData({ ...formData, teamId: e.target.value })}
                     required
                   >
                     <option value="">Select Team</option>
                     {teams.map((team) => (
                       <option key={team.id} value={team.id}>
-                        {team.team_name}
+                        {team.teamName}
                       </option>
                     ))}
                   </Form.Select>

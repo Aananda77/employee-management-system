@@ -154,13 +154,69 @@ const AdminDashboard: React.FC = () => {
               <div className="col-md-6 mb-3">
                 <div className="card">
                   <div className="card-header">
-                    <h5 className="mb-0">Task Statistics</h5>
+                    <h5 className="mb-0">Monthly Attendance</h5>
+                  </div>
+                  <div className="card-body">
+                    <ResponsiveContainer width="100%" height={300}>
+                      <BarChart data={dashboardData?.charts?.monthlyAttendance}>
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis dataKey="month" />
+                        <YAxis />
+                        <Tooltip />
+                        <Legend />
+                        <Bar dataKey="present_days" name="Present" fill="#28a745" />
+                        <Bar dataKey="absent_days" name="Absent" fill="#dc3545" />
+                        <Bar dataKey="late_days" name="Late" fill="#fd7e14" />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+              </div>
+
+              <div className="col-md-6 mb-3">
+                <div className="card">
+                  <div className="card-header">
+                    <h5 className="mb-0">Task Completion Rate</h5>
+                  </div>
+                  <div className="card-body">
+                    <ResponsiveContainer width="100%" height={300}>
+                      <BarChart data={dashboardData?.charts?.taskCompletionRate}>
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis dataKey="month" />
+                        <YAxis />
+                        <Tooltip />
+                        <Legend />
+                        <Bar dataKey="completed" name="Completed" fill="#00C49F" />
+                        <Bar dataKey="total" name="Total" fill="#0088FE" />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="row mb-4">
+              <div className="col-md-6 mb-3">
+                <div className="card">
+                  <div className="card-header">
+                    <h5 className="mb-0">Leave Statistics</h5>
                   </div>
                   <div className="card-body">
                     <ResponsiveContainer width="100%" height={300}>
                       <PieChart>
                         <Pie
-                          data={dashboardData?.taskStats}
+                          data={dashboardData?.charts?.leaveStats?.map((leave: any) => ({
+                            name: (() => {
+                              switch (leave.leave_type) {
+                                case 'sick': return 'Sick Leave';
+                                case 'casual': return 'Casual Leave';
+                                case 'annual': return 'Annual Leave';
+                                case 'wfh': return 'Work From Home';
+                                default: return leave.leave_type || 'Other';
+                              }
+                            })(),
+                            count: leave.count
+                          }))}
                           cx="50%"
                           cy="50%"
                           labelLine={false}
@@ -169,7 +225,7 @@ const AdminDashboard: React.FC = () => {
                           fill="#8884d8"
                           dataKey="count"
                         >
-                          {dashboardData?.taskStats?.map((entry: any, index: number) => (
+                          {dashboardData?.charts?.leaveStats?.map((entry: any, index: number) => (
                             <Cell key={`cell-${index}`} fill={taskColors[index % taskColors.length]} />
                           ))}
                         </Pie>
@@ -179,25 +235,20 @@ const AdminDashboard: React.FC = () => {
                   </div>
                 </div>
               </div>
-              
+
               <div className="col-md-6 mb-3">
                 <div className="card">
                   <div className="card-header">
-                    <h5 className="mb-0">Attendance Overview (Last 7 Days)</h5>
+                    <h5 className="mb-0">Department Distribution</h5>
                   </div>
                   <div className="card-body">
                     <ResponsiveContainer width="100%" height={300}>
-                      <BarChart data={dashboardData?.attendanceStats}>
+                      <BarChart data={dashboardData?.charts?.departmentDistribution} layout="vertical">
                         <CartesianGrid strokeDasharray="3 3" />
-                        <XAxis dataKey="status" />
-                        <YAxis />
+                        <XAxis type="number" />
+                        <YAxis type="category" dataKey="department_name" />
                         <Tooltip />
-                        <Legend />
-                        <Bar dataKey="count" fill="#8884d8">
-                          {dashboardData?.attendanceStats?.map((entry: any, index: number) => (
-                            <Cell key={`cell-${index}`} fill={attendanceColors[index % attendanceColors.length]} />
-                          ))}
-                        </Bar>
+                        <Bar dataKey="employee_count" fill="#8884d8" />
                       </BarChart>
                     </ResponsiveContainer>
                   </div>

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import { db } from '../firebase/config';
+import { collection, getDocs, addDoc, doc, updateDoc, Timestamp } from 'firebase/firestore';
 import toast from 'react-hot-toast';
 import { useAuth } from '../context/AuthContext';
 import Sidebar from '../components/Sidebar';
@@ -7,27 +8,42 @@ import Navbar from '../components/Navbar';
 import { Modal, Button, Form } from 'react-bootstrap';
 
 const Leaves: React.FC = () => {
-  const { user } = useAuth();
+  const { user, userData } = useAuth();
   const [leaves, setLeaves] = useState<any[]>([]);
+  const [users, setUsers] = useState<any[]>([]);
   const [showModal, setShowModal] = useState(false);
   const [formData, setFormData] = useState({
     reason: '',
-    leave_type: '',
-    start_date: '',
-    end_date: ''
+    leaveType: '',
+    startDate: '',
+    endDate: ''
   });
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     fetchLeaves();
+    fetchUsers();
   }, []);
 
   const fetchLeaves = async () => {
     try {
-      const response = await axios.get('/api/leaves');
-      setLeaves(response.data.leaveRequests);
-    } catch (error: any) {
+      const querySnapshot = await getDocs(collection(db, 'leaves'));
+      const leavesList: any[] = [];
+      querySnapshot.forEach(doc => leavesList.push({ id: doc.id, ...doc.data() }));
+      setLeaves(leavesList.sort((a, b) => b.createdAt?.toDate() - a.createdAt?.toDate()));
+    } catch (error) {
       toast.error('Failed to fetch leave requests');
+    }
+  };
+
+  const fetchUsers = async () => {
+    try {
+      const querySnapshot = await getDocs(collection(db, 'users'));
+      const usersList: any[] = [];
+      querySnapshot.forEach(doc => usersList.push({ id: doc.id, ...doc.data() }));
+      setUsers(usersList);
+    } catch (error) {
+      toast.error('Failed to fetch users');
     }
   };
 
@@ -36,23 +52,30 @@ const Leaves: React.FC = () => {
     setLoading(true);
     
     try {
-      await axios.post('/api/leaves', formData);
+      await addDoc(collection(db, 'leaves'), {
+        ...formData,
+        userId: user?.uid,
+        username: userData?.username,
+        status: 'pending',
+        createdAt: Timestamp.now()
+      });
       toast.success('Leave request submitted successfully');
       setShowModal(false);
       fetchLeaves();
-    } catch (error: any) {
-      toast.error(error.response?.data?.message || 'Operation failed');
+    } catch (error) {
+      toast.error('Failed to submit leave request');
     } finally {
       setLoading(false);
     }
   };
 
-  const handleReview = async (id: number, status: string) => {
+  const handleReview = async (id: string, status: string) => {
     try {
-      await axios.put(`/api/leaves/${id}`, { status });
+      const leaveDoc = doc(db, 'leaves', id);
+      await updateDoc(leaveDoc, { status, reviewedAt: Timestamp.now() });
       toast.success(`Leave ${status} successfully`);
       fetchLeaves();
-    } catch (error: any) {
+    } catch (error) {
       toast.error('Failed to update leave request');
     }
   };
@@ -66,7 +89,7 @@ const Leaves: React.FC = () => {
           <div className="container-fluid">
             <div className="d-flex justify-content-between align-items-center mb-4">
               <h2>Leave Requests</h2>
-              {user?.role !== 'admin' && (
+              {userData?.role !== 'admin' && (
                 <button
                   className="btn btn-primary"
                   onClick={() => setShowModal(true)}
@@ -93,17 +116,27 @@ const Leaves: React.FC = () => {
                     <tbody>
                       {leaves.map((leave) => (
                         <tr key={leave.id}>
-                          <td>{leave.full_name || leave.username}</td>
-                          <td>{leave.leave_type}</td>
-                          <td>{leave.start_date}</td>
-                          <td>{leave.end_date}</td>
+                          <td>{leave.username}</td>
+                          <td>
+                            {(() => {
+                              switch (leave.leaveType) {
+                                case 'sick': return 'Sick Leave';
+                                case 'casual': return 'Casual Leave';
+                                case 'annual': return 'Annual Leave';
+                                case 'wfh': return 'Work From Home';
+                                default: return leave.leaveType || 'Other';
+                              }
+                            })()}
+                          </td>
+                          <td>{leave.startDate}</td>
+                          <td>{leave.endDate}</td>
                           <td>
                             <span className={`status-badge status-${leave.status}`}>
                               {leave.status}
                             </span>
                           </td>
                           <td>
-                            {(user?.role === 'admin' || user?.role === 'manager') && leave.status === 'pending' && (
+                            {(userData?.role === 'admin' || userData?.role === 'manager') && leave.status === 'pending' && (
                               <>
                                 <button
                                   className="btn btn-sm btn-success me-2"
@@ -131,7 +164,7 @@ const Leaves: React.FC = () => {
         </div>
       </div>
 
-      {user?.role !== 'admin' && (
+      {userData?.role !== 'admin' && (
         <Modal show={showModal} onHide={() => setShowModal(false)}>
           <Modal.Header closeButton>
             <Modal.Title>Request Leave</Modal.Title>
@@ -140,13 +173,18 @@ const Leaves: React.FC = () => {
             <Form onSubmit={handleSubmit}>
               <Form.Group className="mb-3">
                 <Form.Label>Leave Type</Form.Label>
-                <Form.Control
-                  type="text"
-                  value={formData.leave_type}
-                  onChange={(e) => setFormData({ ...formData, leave_type: e.target.value })}
-                  placeholder="e.g., Sick Leave, Vacation"
+                <Form.Select
+                  value={formData.leaveType}
+                  onChange={(e) => setFormData({ ...formData, leaveType: e.target.value })}
                   required
-                />
+                >
+                  <option value="">Select Leave Type</option>
+                  <option value="sick">Sick Leave</option>
+                  <option value="casual">Casual Leave</option>
+                  <option value="annual">Annual Leave</option>
+                  <option value="wfh">Work From Home</option>
+                  <option value="other">Other</option>
+                </Form.Select>
               </Form.Group>
               <Form.Group className="mb-3">
                 <Form.Label>Reason</Form.Label>
@@ -164,8 +202,8 @@ const Leaves: React.FC = () => {
                     <Form.Label>Start Date</Form.Label>
                     <Form.Control
                       type="date"
-                      value={formData.start_date}
-                      onChange={(e) => setFormData({ ...formData, start_date: e.target.value })}
+                      value={formData.startDate}
+                      onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
                       required
                     />
                   </Form.Group>
@@ -175,8 +213,8 @@ const Leaves: React.FC = () => {
                     <Form.Label>End Date</Form.Label>
                     <Form.Control
                       type="date"
-                      value={formData.end_date}
-                      onChange={(e) => setFormData({ ...formData, end_date: e.target.value })}
+                      value={formData.endDate}
+                      onChange={(e) => setFormData({ ...formData, endDate: e.target.value })}
                       required
                     />
                   </Form.Group>

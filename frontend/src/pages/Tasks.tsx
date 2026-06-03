@@ -1,18 +1,30 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
-import toast from 'react-hot-toast';
 import { useAuth } from '../context/AuthContext';
+import { db } from '../firebase/config';
+import {
+  collection,
+  query,
+  where,
+  getDocs,
+  addDoc,
+  doc,
+  getDoc,
+  updateDoc,
+  Timestamp,
+  orderBy
+} from 'firebase/firestore';
+import toast from 'react-hot-toast';
 import Sidebar from '../components/Sidebar';
 import Navbar from '../components/Navbar';
-import { Modal, Button, Form } from 'react-bootstrap';
+import { Modal, Button, Form, Nav, Tab } from 'react-bootstrap';
+import { FaComments, FaHistory, FaEye } from 'react-icons/fa';
 
 const Tasks: React.FC = () => {
-  const { user } = useAuth();
+  const { user, userData } = useAuth();
   const [tasks, setTasks] = useState<any[]>([]);
-  const [teams, setTeams] = useState<any[]>([]);
-  const [users, setUsers] = useState<any[]>([]);
   const [showModal, setShowModal] = useState(false);
   const [showSubmitModal, setShowSubmitModal] = useState(false);
+  const [showDetailModal, setShowDetailModal] = useState(false);
   const [selectedTask, setSelectedTask] = useState<any>(null);
   const [formData, setFormData] = useState({
     title: '',
@@ -20,49 +32,46 @@ const Tasks: React.FC = () => {
     deadline: '',
     priority: 'medium',
     status: 'pending',
-    assigned_to: '',
-    assigned_to_role: 'employee',
-    team_id: ''
+    assigned_to: ''
   });
   const [submitData, setSubmitData] = useState({
     notes: ''
   });
-  const [attachment, setAttachment] = useState<File | null>(null);
-  const [submissionFile, setSubmissionFile] = useState<File | null>(null);
+  const [commentData, setCommentData] = useState('');
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    fetchTasks();
-    if (user?.role === 'admin' || user?.role === 'manager') {
-      fetchTeams();
-      fetchUsers();
+    if (user) {
+      fetchTasks();
     }
-  }, []);
+  }, [user, userData]);
 
   const fetchTasks = async () => {
+    if (!user || !userData) return;
     try {
-      const response = await axios.get('/api/tasks');
-      setTasks(response.data.tasks);
+      let q;
+      if (userData.role === 'admin') {
+        q = query(collection(db, 'tasks'), orderBy('createdAt', 'desc'));
+      } else if (userData.role === 'manager') {
+        q = query(
+          collection(db, 'tasks'),
+          orderBy('createdAt', 'desc')
+        );
+      } else {
+        q = query(
+          collection(db, 'tasks'),
+          where('assignedTo', '==', user.uid),
+          orderBy('createdAt', 'desc')
+        );
+      }
+      const querySnapshot = await getDocs(q);
+      const tasksList: any[] = [];
+      querySnapshot.forEach((doc) => {
+        tasksList.push({ id: doc.id, ...doc.data() });
+      });
+      setTasks(tasksList);
     } catch (error: any) {
       toast.error('Failed to fetch tasks');
-    }
-  };
-
-  const fetchTeams = async () => {
-    try {
-      const response = await axios.get('/api/teams');
-      setTeams(response.data.teams);
-    } catch (error: any) {
-      toast.error('Failed to fetch teams');
-    }
-  };
-
-  const fetchUsers = async () => {
-    try {
-      const response = await axios.get('/api/users');
-      setUsers(response.data.users);
-    } catch (error: any) {
-      toast.error('Failed to fetch users');
     }
   };
 
@@ -71,24 +80,23 @@ const Tasks: React.FC = () => {
     setLoading(true);
     
     try {
-      const form = new FormData();
-      Object.entries(formData).forEach(([key, value]) => {
-        form.append(key, value);
-      });
-      if (attachment) {
-        form.append('attachment', attachment);
-      }
+      const taskData = {
+        ...formData,
+        assignedBy: user?.uid,
+        createdAt: Timestamp.now(),
+        updatedAt: Timestamp.now(),
+        statusHistory: [],
+        comments: []
+      };
       
-      await axios.post('/api/tasks', form, {
-        headers: { 'Content-Type': 'multipart/form-data' }
-      });
+      await addDoc(collection(db, 'tasks'), taskData);
       
       toast.success('Task created successfully');
       setShowModal(false);
       resetForm();
       fetchTasks();
     } catch (error: any) {
-      toast.error(error.response?.data?.message || 'Operation failed');
+      toast.error('Operation failed');
     } finally {
       setLoading(false);
     }
@@ -100,24 +108,66 @@ const Tasks: React.FC = () => {
     setLoading(true);
     
     try {
-      const form = new FormData();
-      form.append('notes', submitData.notes);
-      if (submissionFile) {
-        form.append('submission_file', submissionFile);
-      }
+      const taskRef = doc(db, 'tasks', selectedTask.id);
+      const oldStatus = selectedTask.status;
       
-      await axios.post(`/api/tasks/${selectedTask.id}/submit`, form, {
-        headers: { 'Content-Type': 'multipart/form-data' }
+      await updateDoc(taskRef, {
+        status: 'completed',
+        updatedAt: Timestamp.now(),
+        statusHistory: [
+          ...selectedTask.statusHistory,
+          {
+            oldStatus,
+            newStatus: 'completed',
+            changedBy: user?.uid,
+            changedAt: Timestamp.now()
+          }
+        ]
       });
       
       toast.success('Task submitted successfully');
       setShowSubmitModal(false);
       fetchTasks();
     } catch (error: any) {
-      toast.error(error.response?.data?.message || 'Operation failed');
+      toast.error('Operation failed');
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleAddComment = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedTask || !commentData.trim()) return;
+    
+    try {
+      const taskRef = doc(db, 'tasks', selectedTask.id);
+      const newComment = {
+        userId: user?.uid,
+        username: userData?.username || user?.email,
+        comment: commentData,
+        createdAt: Timestamp.now()
+      };
+      
+      await updateDoc(taskRef, {
+        comments: [...(selectedTask.comments || []), newComment],
+        updatedAt: Timestamp.now()
+      });
+      
+      setCommentData('');
+      setSelectedTask({
+        ...selectedTask,
+        comments: [...(selectedTask.comments || []), newComment]
+      });
+      
+      toast.success('Comment added successfully');
+    } catch (error: any) {
+      toast.error('Failed to add comment');
+    }
+  };
+
+  const openTaskDetail = async (task: any) => {
+    setSelectedTask(task);
+    setShowDetailModal(true);
   };
 
   const resetForm = () => {
@@ -127,15 +177,33 @@ const Tasks: React.FC = () => {
       deadline: '',
       priority: 'medium',
       status: 'pending',
-      assigned_to: '',
-      assigned_to_role: 'employee',
-      team_id: ''
+      assigned_to: ''
     });
-    setAttachment(null);
   };
 
-  const getBaseRoute = () => {
-    return user?.role === 'admin' ? '/admin' : user?.role === 'manager' ? '/manager' : '/employee';
+  const getStatusBadgeClass = (status: string) => {
+    switch (status) {
+      case 'pending': return 'bg-warning text-dark';
+      case 'in_progress': return 'bg-primary';
+      case 'completed': return 'bg-success';
+      default: return 'bg-secondary';
+    }
+  };
+
+  const getPriorityBadgeClass = (priority: string) => {
+    switch (priority) {
+      case 'low': return 'bg-info text-dark';
+      case 'medium': return 'bg-warning text-dark';
+      case 'high': return 'bg-danger';
+      case 'urgent': return 'bg-dark';
+      default: return 'bg-secondary';
+    }
+  };
+
+  const formatTimestamp = (ts: any) => {
+    if (!ts) return '';
+    const date = ts instanceof Timestamp ? ts.toDate() : new Date(ts);
+    return date.toLocaleString();
   };
 
   return (
@@ -147,7 +215,7 @@ const Tasks: React.FC = () => {
           <div className="container-fluid">
             <div className="d-flex justify-content-between align-items-center mb-4">
               <h2>Tasks</h2>
-              {(user?.role === 'admin' || user?.role === 'manager') && (
+              {(userData?.role === 'admin' || userData?.role === 'manager') && (
                 <button
                   className="btn btn-primary"
                   onClick={() => setShowModal(true)}
@@ -175,28 +243,36 @@ const Tasks: React.FC = () => {
                         <tr key={task.id}>
                           <td>{task.title}</td>
                           <td>
-                            <span className={`status-badge priority-${task.priority}`}>
+                            <span className={`badge ${getPriorityBadgeClass(task.priority)}`}>
                               {task.priority}
                             </span>
                           </td>
                           <td>
-                            <span className={`status-badge status-${task.status}`}>
+                            <span className={`badge ${getStatusBadgeClass(task.status)}`}>
                               {task.status}
                             </span>
                           </td>
                           <td>{task.deadline}</td>
                           <td>
-                            {user?.role === 'employee' && task.status !== 'completed' && (
+                            <div className="btn-group" role="group">
                               <button
-                                className="btn btn-sm btn-success"
-                                onClick={() => {
-                                  setSelectedTask(task);
-                                  setShowSubmitModal(true);
-                                }}
+                                className="btn btn-sm btn-info"
+                                onClick={() => openTaskDetail(task)}
                               >
-                                Submit
+                                <FaEye className="me-1" /> View
                               </button>
-                            )}
+                              {userData?.role === 'employee' && task.status !== 'completed' && (
+                                <button
+                                  className="btn btn-sm btn-success"
+                                  onClick={() => {
+                                    setSelectedTask(task);
+                                    setShowSubmitModal(true);
+                                  }}
+                                >
+                                  Submit
+                                </button>
+                              )}
+                            </div>
                           </td>
                         </tr>
                       ))}
@@ -209,7 +285,7 @@ const Tasks: React.FC = () => {
         </div>
       </div>
 
-      {(user?.role === 'admin' || user?.role === 'manager') && (
+      {(userData?.role === 'admin' || userData?.role === 'manager') && (
         <Modal show={showModal} onHide={() => setShowModal(false)} size="lg">
           <Modal.Header closeButton>
             <Modal.Title>Add Task</Modal.Title>
@@ -261,13 +337,6 @@ const Tasks: React.FC = () => {
                   </Form.Group>
                 </div>
               </div>
-              <Form.Group className="mb-3">
-                <Form.Label>Attachment</Form.Label>
-                <Form.Control
-                  type="file"
-                  onChange={(e) => setAttachment((e.target as HTMLInputElement).files?.[0] || null)}
-                />
-              </Form.Group>
               <div className="d-flex justify-content-end">
                 <Button variant="secondary" onClick={() => setShowModal(false)} className="me-2">
                   Cancel
@@ -281,7 +350,7 @@ const Tasks: React.FC = () => {
         </Modal>
       )}
 
-      {user?.role === 'employee' && (
+      {userData?.role === 'employee' && (
         <Modal show={showSubmitModal} onHide={() => setShowSubmitModal(false)}>
           <Modal.Header closeButton>
             <Modal.Title>Submit Task</Modal.Title>
@@ -297,13 +366,6 @@ const Tasks: React.FC = () => {
                   onChange={(e) => setSubmitData({ ...submitData, notes: e.target.value })}
                 />
               </Form.Group>
-              <Form.Group className="mb-3">
-                <Form.Label>File</Form.Label>
-                <Form.Control
-                  type="file"
-                  onChange={(e) => setSubmissionFile((e.target as HTMLInputElement).files?.[0] || null)}
-                />
-              </Form.Group>
               <div className="d-flex justify-content-end">
                 <Button variant="secondary" onClick={() => setShowSubmitModal(false)} className="me-2">
                   Cancel
@@ -313,6 +375,100 @@ const Tasks: React.FC = () => {
                 </Button>
               </div>
             </Form>
+          </Modal.Body>
+        </Modal>
+      )}
+
+      {selectedTask && (
+        <Modal show={showDetailModal} onHide={() => setShowDetailModal(false)} size="xl">
+          <Modal.Header closeButton>
+            <Modal.Title>
+              {selectedTask.title}
+              <span className={`badge ${getPriorityBadgeClass(selectedTask.priority)} ms-2`}>
+                {selectedTask.priority}
+              </span>
+            </Modal.Title>
+          </Modal.Header>
+          <Modal.Body>
+            <div className="mb-4">
+              <h5>Description</h5>
+              <p>{selectedTask.description || 'No description provided'}</p>
+              <div className="d-flex gap-3 mt-3">
+                <div><strong>Status:</strong> <span className={`badge ${getStatusBadgeClass(selectedTask.status)}`}>{selectedTask.status}</span></div>
+                <div><strong>Deadline:</strong> {selectedTask.deadline}</div>
+              </div>
+            </div>
+
+            <Tab.Container id="task-tabs" defaultActiveKey="comments">
+              <Nav variant="tabs">
+                <Nav.Item>
+                  <Nav.Link eventKey="comments">
+                    <FaComments className="me-1" /> Comments
+                  </Nav.Link>
+                </Nav.Item>
+                <Nav.Item>
+                  <Nav.Link eventKey="history">
+                    <FaHistory className="me-1" /> Status History
+                  </Nav.Link>
+                </Nav.Item>
+              </Nav>
+              <Tab.Content className="mt-3">
+                <Tab.Pane eventKey="comments">
+                  <div className="mb-4">
+                    <Form onSubmit={handleAddComment}>
+                      <Form.Group className="mb-2">
+                        <Form.Control
+                          as="textarea"
+                          rows={2}
+                          placeholder="Add a comment..."
+                          value={commentData}
+                          onChange={(e) => setCommentData(e.target.value)}
+                        />
+                      </Form.Group>
+                      <Button variant="primary" type="submit" size="sm">
+                        Add Comment
+                      </Button>
+                    </Form>
+                  </div>
+                  <div className="border-top pt-3">
+                    {selectedTask.comments?.length === 0 ? (
+                      <p className="text-muted">No comments yet</p>
+                    ) : (
+                      selectedTask.comments?.map((comment: any, index: number) => (
+                        <div key={index} className="mb-3 pb-3 border-bottom">
+                          <div className="d-flex justify-content-between align-items-start">
+                            <strong>{comment.username}</strong>
+                            <small className="text-muted">{formatTimestamp(comment.createdAt)}</small>
+                          </div>
+                          <p className="mb-0 mt-1">{comment.comment}</p>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </Tab.Pane>
+                <Tab.Pane eventKey="history">
+                  {selectedTask.statusHistory?.length === 0 ? (
+                    <p className="text-muted">No status changes yet</p>
+                  ) : (
+                    <div className="timeline">
+                      {selectedTask.statusHistory?.map((item: any, index: number) => (
+                        <div key={index} className="mb-3 pb-3 border-bottom">
+                          <div className="d-flex justify-content-between align-items-start">
+                            <div>
+                              <strong>
+                                {item.oldStatus ? `${item.oldStatus} → ` : ''}
+                                {item.newStatus}
+                              </strong>
+                            </div>
+                            <small className="text-muted">{formatTimestamp(item.changedAt)}</small>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </Tab.Pane>
+              </Tab.Content>
+            </Tab.Container>
           </Modal.Body>
         </Modal>
       )}

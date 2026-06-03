@@ -4,7 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { FaUser, FaLock } from 'react-icons/fa';
 
 const Login: React.FC = () => {
-  const [username, setUsername] = useState('');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const { login } = useAuth();
@@ -13,7 +13,7 @@ const Login: React.FC = () => {
     e.preventDefault();
     setLoading(true);
     try {
-      await login(username, password);
+      await login(email, password);
     } catch (error) {
     } finally {
       setLoading(false);
@@ -29,14 +29,14 @@ const Login: React.FC = () => {
           
           <form onSubmit={handleSubmit}>
             <div className="mb-3">
-              <label className="form-label">Username</label>
+              <label className="form-label">Email</label>
               <div className="input-group">
                 <span className="input-group-text"><FaUser /></span>
                 <input
-                  type="text"
+                  type="email"
                   className="form-control"
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
                   required
                 />
               </div>

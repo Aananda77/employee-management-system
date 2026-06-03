@@ -3,6 +3,7 @@ import axios from 'axios';
 import toast from 'react-hot-toast';
 import Sidebar from '../../components/Sidebar';
 import Navbar from '../../components/Navbar';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 
 const ManagerDashboard: React.FC = () => {
   const [dashboardData, setDashboardData] = useState<any>(null);
@@ -48,6 +49,51 @@ const ManagerDashboard: React.FC = () => {
                   </div>
                   <div className="card-body">
                     <p className="mb-0">Team: {dashboardData?.team?.team_name || 'Not assigned'}</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="row mb-4">
+              <div className="col-md-6 mb-3">
+                <div className="card">
+                  <div className="card-header">
+                    <h5 className="mb-0">Team Monthly Attendance</h5>
+                  </div>
+                  <div className="card-body">
+                    <ResponsiveContainer width="100%" height={300}>
+                      <BarChart data={dashboardData?.charts?.monthlyAttendance}>
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis dataKey="month" />
+                        <YAxis />
+                        <Tooltip />
+                        <Legend />
+                        <Bar dataKey="present_days" name="Present" fill="#28a745" />
+                        <Bar dataKey="absent_days" name="Absent" fill="#dc3545" />
+                        <Bar dataKey="late_days" name="Late" fill="#fd7e14" />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+              </div>
+
+              <div className="col-md-6 mb-3">
+                <div className="card">
+                  <div className="card-header">
+                    <h5 className="mb-0">Team Task Completion Rate</h5>
+                  </div>
+                  <div className="card-body">
+                    <ResponsiveContainer width="100%" height={300}>
+                      <BarChart data={dashboardData?.charts?.taskCompletionRate}>
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis dataKey="month" />
+                        <YAxis />
+                        <Tooltip />
+                        <Legend />
+                        <Bar dataKey="completed" name="Completed" fill="#00C49F" />
+                        <Bar dataKey="total" name="Total" fill="#0088FE" />
+                      </BarChart>
+                    </ResponsiveContainer>
                   </div>
                 </div>
               </div>

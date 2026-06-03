@@ -5,6 +5,7 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import AdminDashboard from './pages/admin/AdminDashboard';
+import DepartmentManagement from './pages/admin/DepartmentManagement';
 import TeamManagement from './pages/admin/TeamManagement';
 import UserManagement from './pages/admin/UserManagement';
 import ManagerDashboard from './pages/manager/ManagerDashboard';
@@ -16,7 +17,7 @@ import Leaves from './pages/Leaves';
 import Announcements from './pages/Announcements';
 
 const ProtectedRoute: React.FC<{ children: React.ReactNode; roles?: string[] }> = ({ children, roles }) => {
-  const { user, loading, profileComplete } = useAuth();
+  const { user, userData, loading, profileComplete } = useAuth();
 
   if (loading) {
     return <div className="d-flex justify-content-center align-items-center vh-100"><div className="spinner-border" role="status"></div></div>;
@@ -26,11 +27,11 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode; roles?: string[] }> 
     return <Navigate to="/login" replace />;
   }
 
-  if (roles && !roles.includes(user.role)) {
+  if (roles && userData && !roles.includes(userData.role)) {
     return <Navigate to="/" replace />;
   }
 
-  if (user.role !== 'admin' && !profileComplete) {
+  if (userData && userData.role !== 'admin' && !profileComplete) {
     return <Navigate to="/profile-setup" replace />;
   }
 
@@ -38,16 +39,16 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode; roles?: string[] }> 
 };
 
 const PublicRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { user, loading } = useAuth();
+  const { user, userData, loading } = useAuth();
 
   if (loading) {
     return <div className="d-flex justify-content-center align-items-center vh-100"><div className="spinner-border" role="status"></div></div>;
   }
 
-  if (user) {
-    if (user.role === 'admin') {
+  if (user && userData) {
+    if (userData.role === 'admin') {
       return <Navigate to="/admin/dashboard" replace />;
-    } else if (user.role === 'manager') {
+    } else if (userData.role === 'manager') {
       return <Navigate to="/manager/dashboard" replace />;
     } else {
       return <Navigate to="/employee/dashboard" replace />;
@@ -58,7 +59,7 @@ const PublicRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 };
 
 const AppContent: React.FC = () => {
-  const { user } = useAuth();
+  const { user, userData } = useAuth();
 
   return (
     <div className="App">
@@ -76,6 +77,11 @@ const AppContent: React.FC = () => {
         <Route path="/admin/dashboard" element={
           <ProtectedRoute roles={['admin']}>
             <AdminDashboard />
+          </ProtectedRoute>
+        } />
+        <Route path="/admin/departments" element={
+          <ProtectedRoute roles={['admin']}>
+            <DepartmentManagement />
           </ProtectedRoute>
         } />
         <Route path="/admin/teams" element={

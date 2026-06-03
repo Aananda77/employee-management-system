@@ -1,158 +1,75 @@
-# Employee Management System
+# Employee Management System (EMS)
 
-A professional full-stack A3-level Employee Management System built with React.js, Node.js + Express.js, and MySQL.
+A professional Employee Management System with React frontend and Firebase backend!
 
-## Features
+## Setup Instructions
 
-### Authentication
-- JWT Authentication
-- Secure login/register
-- Password hashing using bcrypt
-- Role-based protected routes
-- Session management
+### 1. Firebase Setup
 
-### Roles
-1. **Admin**: Full system access
-2. **Manager**: Team management
-3. **Employee**: Individual access
+1. Go to [Firebase Console](https://console.firebase.google.com/)
+2. Create a new project
+3. Enable **Firebase Authentication** (Email/Password provider)
+4. Enable **Cloud Firestore** (Database)
+5. Enable **Firebase Storage** (for file uploads)
+6. Get your Firebase config from Project Settings → Add app → Web app
 
-### Admin Features
-- Team Management (Create/Edit/Delete)
-- Employee & Manager Control
-- Task Management
-- Leave Management
-- Notice & Announcement System
-- Attendance Monitoring
-- Dashboard with Analytics
+### 2. Configure Firebase in the App
 
-### Manager Features
-- Profile Setup
-- Team Details
-- Task Assignment
-- Attendance Management
-- Leave Request
-- Team Announcements
+Update `frontend/src/firebase/config.ts` with your Firebase config:
 
-### Employee Features
-- Profile Setup
-- Personal Dashboard
-- Task Management
-- Attendance
-- Leave Request
-
-## Tech Stack
-
-### Frontend
-- React.js (TypeScript)
-- React Router DOM
-- Axios
-- Context API
-- React Bootstrap
-- React Icons
-- React Hot Toast
-- Recharts
-
-### Backend
-- Node.js
-- Express.js
-- MySQL
-- JWT
-- bcryptjs
-- multer
-- cors
-
-## Installation & Setup
-
-### Prerequisites
-- Node.js
-- MySQL
-- npm or yarn
-
-### Database Setup
-1. Create a MySQL database
-2. Import the database schema from `backend/database.sql`
-
-### Backend Setup
-1. Navigate to backend directory: `cd backend`
-2. Install dependencies: `npm install`
-3. Create a `.env` file with your database credentials and JWT secret
-4. Start the server: `node server.js` or `npm start`
-
-### Frontend Setup
-1. Navigate to frontend directory: `cd frontend`
-2. Install dependencies: `npm install`
-3. Start the development server: `npm start`
-
-## Project Structure
-
-```
-employee-management-system/
-├── backend/
-│   ├── config/
-│   │   └── database.js
-│   ├── controllers/
-│   │   ├── authController.js
-│   │   ├── teamController.js
-│   │   ├── userController.js
-│   │   ├── taskController.js
-│   │   ├── attendanceController.js
-│   │   ├── leaveController.js
-│   │   ├── announcementController.js
-│   │   └── dashboardController.js
-│   ├── middleware/
-│   │   ├── auth.js
-│   │   └── upload.js
-│   ├── routes/
-│   │   ├── authRoutes.js
-│   │   ├── teamRoutes.js
-│   │   ├── userRoutes.js
-│   │   ├── taskRoutes.js
-│   │   ├── attendanceRoutes.js
-│   │   ├── leaveRoutes.js
-│   │   ├── announcementRoutes.js
-│   │   └── dashboardRoutes.js
-│   ├── uploads/
-│   ├── database.sql
-│   ├── server.js
-│   └── package.json
-└── frontend/
-    ├── public/
-    ├── src/
-    │   ├── components/
-    │   │   ├── Sidebar.tsx
-    │   │   └── Navbar.tsx
-    │   ├── context/
-    │   │   └── AuthContext.tsx
-    │   ├── pages/
-    │   │   ├── admin/
-    │   │   │   ├── AdminDashboard.tsx
-    │   │   │   ├── TeamManagement.tsx
-    │   │   │   └── UserManagement.tsx
-    │   │   ├── manager/
-    │   │   │   └── ManagerDashboard.tsx
-    │   │   ├── employee/
-    │   │   │   └── EmployeeDashboard.tsx
-    │   │   ├── Login.tsx
-    │   │   ├── Register.tsx
-    │   │   ├── ProfileSetup.tsx
-    │   │   ├── Tasks.tsx
-    │   │   ├── Attendance.tsx
-    │   │   ├── Leaves.tsx
-    │   │   └── Announcements.tsx
-    │   ├── App.tsx
-    │   ├── index.tsx
-    │   └── index.css
-    └── package.json
+```typescript
+const firebaseConfig = {
+  apiKey: "YOUR_API_KEY",
+  authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
+  projectId: "YOUR_PROJECT_ID",
+  storageBucket: "YOUR_PROJECT_ID.appspot.com",
+  messagingSenderId: "YOUR_SENDER_ID",
+  appId: "YOUR_APP_ID"
+};
 ```
 
-## Default Credentials
+### 3. Firestore Security Rules
 
-To get started, you'll need to register an admin account first through the registration page.
+Add these security rules in Firebase Console → Firestore Database → Rules:
 
-## Usage
+```rules
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Allow authenticated users to read/write their own data
+    match /users/{uid} {
+      allow read, write: if request.auth != null && request.auth.uid == uid;
+    }
+    
+    match /profiles/{uid} {
+      allow read, write: if request.auth != null && request.auth.uid == uid;
+    }
+    
+    match /notifications/{id} {
+      allow read, write: if request.auth != null && resource.data.uid == request.auth.uid;
+    }
+    
+    // Admin can manage everything
+    match /{document=**} {
+      allow read, write: if request.auth != null && 
+        exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+  }
+}
+```
 
-1. Register as an admin
-2. Create at least one team
-3. Add managers and employees
-4. Assign users to teams
-5. Start managing tasks, attendance, and leaves!
+### 4. Run the App
+
+```bash
+# Frontend
+cd frontend
+npm install
+npm start
+```
+
+## Login Credentials (after creating users in Firebase)
+
+- Admin: Create with role `admin`
+- Manager: Create with role `manager`
+- Employee: Create with role `employee`
